@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#243447" />
+  <title>Bursdagsoversikt</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <style>
+    :root{
+      --bg:#f4f7fb; --card:#fff; --text:#1f2937; --muted:#6b7280;
+      --line:#dbe3ec; --accent:#243447; --accent2:#e7eef6;
+      --today:#fff5d9; --danger:#b42318;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
+    .wrap{max-width:900px;margin:0 auto;padding:18px}
+    header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}
+    h1{font-size:clamp(1.7rem,4vw,2.5rem);margin:0}
+    .version{font-size:.8rem;color:var(--muted)}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;box-shadow:0 6px 20px rgba(31,41,55,.05);margin-bottom:16px}
+    .hero{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center}
+    .hero h2{margin:0 0 6px;font-size:1.25rem}
+    .hero p{margin:0;color:var(--muted)}
+    .badge{background:var(--accent2);padding:10px 14px;border-radius:999px;font-weight:700;white-space:nowrap}
+    .today-banner{background:var(--today);border:1px solid #f2d488;border-radius:16px;padding:14px 16px;margin-bottom:16px;font-weight:700;display:none}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    label{display:block;font-size:.9rem;font-weight:700;margin-bottom:6px}
+    input,button{font:inherit}
+    input{width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:#fff}
+    button{border:0;border-radius:12px;padding:11px 14px;font-weight:700;cursor:pointer}
+    .primary{background:var(--accent);color:#fff}
+    .secondary{background:var(--accent2);color:var(--accent)}
+    .danger{background:#fee4e2;color:var(--danger)}
+    .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+    .section-title{display:flex;justify-content:space-between;align-items:end;gap:10px;margin-bottom:10px}
+    .section-title h2{margin:0;font-size:1.2rem}
+    .section-title span{font-size:.9rem;color:var(--muted)}
+    .list{display:grid;gap:10px}
+    .person{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+    .person.today{background:var(--today);border-color:#f2d488}
+    .name{font-weight:800}
+    .meta{color:var(--muted);font-size:.92rem;margin-top:2px}
+    .row-actions{display:flex;gap:7px}
+    .row-actions button{padding:8px 10px;font-size:.85rem}
+    .empty{color:var(--muted);text-align:center;padding:18px 8px}
+    .note{font-size:.9rem;color:var(--muted);line-height:1.45;margin-top:12px}
+    .install{display:none}
+    @media(max-width:620px){.grid{grid-template-columns:1fr}.hero{grid-template-columns:1fr}.person{grid-template-columns:1fr}.row-actions{justify-content:flex-start}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Bursdagsoversikt</h1>
+      <div class="version">v1.0</div>
+    </div>
+    <button id="installBtn" class="secondary install">Installer app</button>
+  </header>
+
+  <div id="todayBanner" class="today-banner"></div>
+
+  <section class="card hero">
+    <div>
+      <h2 id="nextTitle">Neste bursdag</h2>
+      <p id="nextText">Ingen elever registrert ennå.</p>
+    </div>
+    <div class="badge" id="countBadge">0 elever</div>
+  </section>
+
+  <section class="card">
+    <div class="section-title">
+      <h2>Legg til elev</h2>
+      <span>Kun navn, dag og måned</span>
+    </div>
+    <form id="studentForm">
+      <div class="grid">
+        <div>
+          <label for="name">Navn</label>
+          <input id="name" autocomplete="off" placeholder="For eksempel Brede" required />
+        </div>
+        <div>
+          <label for="birthday">Bursdag</label>
+          <input id="birthday" type="date" required />
+        </div>
+      </div>
+      <div class="actions">
+        <button class="primary" type="submit" id="saveBtn">Legg til elev</button>
+        <button class="secondary" type="button" id="cancelEdit" style="display:none">Avbryt redigering</button>
+      </div>
+    </form>
+    <div class="note">Året brukes ikke i oversikten. Appen lagrer bare navn, dag og måned lokalt på enheten.</div>
+  </section>
+
+  <section class="card">
+    <div class="section-title">
+      <h2>Varsling</h2>
+      <span id="notificationStatus">Ikke aktivert</span>
+    </div>
+    <div class="actions">
+      <button class="secondary" id="enableNotifications">Aktiver bursdagsvarsel</button>
+      <button class="secondary" id="testNotification">Test varsel</button>
+    </div>
+    <div class="note">v1.0 kan varsle når appen åpnes på selve bursdagen. Fullt automatisk varsel når appen er helt lukket krever en ekstern push-tjeneste/server og er derfor ikke slått på i denne første versjonen.</div>
+  </section>
+
+  <section class="card">
+    <div class="section-title">
+      <h2>Kommende bursdager</h2>
+      <span id="monthLabel"></span>
+    </div>
+    <div id="studentList" class="list"></div>
+  </section>
+</div>
+<script>
+const STORAGE_KEY='bursdagsoversikt_students_v1';
+const NOTIFIED_KEY='bursdagsoversikt_notified_v1';
+let students=JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]');
+let editId=null;
+let deferredPrompt=null;
+
+const $=id=>document.getElementById(id);
+const monthNames=['januar','februar','mars','april','mai','juni','juli','august','september','oktober','november','desember'];
+
+function save(){ localStorage.setItem(STORAGE_KEY,JSON.stringify(students)); render(); }
+function pad(n){return String(n).padStart(2,'0')}
+function todayParts(){ const d=new Date(); return {m:d.getMonth()+1,d:d.getDate(),y:d.getFullYear()}; }
+function nextBirthday(s){
+  const now=new Date(); now.setHours(0,0,0,0);
+  let d=new Date(now.getFullYear(),s.month-1,s.day);
+  if(d<now) d=new Date(now.getFullYear()+1,s.month-1,s.day);
+  return d;
+}
+function daysUntil(s){
+  const now=new Date(); now.setHours(0,0,0,0);
+  return Math.round((nextBirthday(s)-now)/86400000);
+}
+function formatBirthday(s){return `${s.day}. ${monthNames[s.month-1]}`}
+function sortedStudents(){return [...students].sort((a,b)=>nextBirthday(a)-nextBirthday(b)||a.name.localeCompare(b.name,'no'))}
+
+function render(){
+  const list=$('studentList'); list.innerHTML='';
+  const sorted=sortedStudents();
+  $('countBadge').textContent=`${students.length} ${students.length===1?'elev':'elever'}`;
+  const t=todayParts();
+  const birthdayToday=students.filter(s=>s.day===t.d&&s.month===t.m);
+  const banner=$('todayBanner');
+  if(birthdayToday.length){
+    banner.style.display='block';
+    banner.textContent=birthdayToday.length===1?`${birthdayToday[0].name} har bursdag i dag!`:`${birthdayToday.map(s=>s.name).join(', ')} har bursdag i dag!`;
+  } else banner.style.display='none';
+
+  if(sorted.length){
+    const n=sorted[0], days=daysUntil(n);
+    $('nextTitle').textContent=days===0?'Bursdag i dag':'Neste bursdag';
+    $('nextText').textContent=days===0?`${n.name} har bursdag i dag.`:`${n.name} – ${formatBirthday(n)} (${days===1?'i morgen':`om ${days} dager`})`;
+  } else {
+    $('nextTitle').textContent='Neste bursdag'; $('nextText').textContent='Ingen elever registrert ennå.';
+  }
+
+  $('monthLabel').textContent=`${monthNames[t.m-1][0].toUpperCase()+monthNames[t.m-1].slice(1)} ${t.y}`;
+  if(!sorted.length){ list.innerHTML='<div class="empty">Legg inn første elev for å starte oversikten.</div>'; return; }
+  sorted.forEach(s=>{
+    const days=daysUntil(s); const isToday=days===0;
+    const el=document.createElement('div'); el.className='person'+(isToday?' today':'');
+    el.innerHTML=`<div><div class="name">${escapeHtml(s.name)}</div><div class="meta">${formatBirthday(s)} · ${isToday?'I dag':days===1?'I morgen':`Om ${days} dager`}</div></div><div class="row-actions"><button class="secondary" data-edit="${s.id}">Rediger</button><button class="danger" data-del="${s.id}">Slett</button></div>`;
+    list.appendChild(el);
+  });
+  list.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>startEdit(b.dataset.edit));
+  list.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>removeStudent(b.dataset.del));
+  updateNotificationStatus();
+  maybeNotifyBirthday();
+}
+function escapeHtml(str){return str.replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
+function startEdit(id){
+  const s=students.find(x=>x.id===id); if(!s)return;
+  editId=id; $('name').value=s.name; $('birthday').value=`2000-${pad(s.month)}-${pad(s.day)}`;
+  $('saveBtn').textContent='Lagre endring'; $('cancelEdit').style.display='inline-block'; $('name').focus();
+}
+function cancelEdit(){ editId=null; $('studentForm').reset(); $('saveBtn').textContent='Legg til elev'; $('cancelEdit').style.display='none'; }
+function removeStudent(id){
+  const s=students.find(x=>x.id===id); if(!s)return;
+  if(confirm(`Slette ${s.name} fra bursdagsoversikten?`)){ students=students.filter(x=>x.id!==id); save(); if(editId===id)cancelEdit(); }
+}
+$('studentForm').addEventListener('submit',e=>{
+  e.preventDefault(); const name=$('name').value.trim(); const raw=$('birthday').value; if(!name||!raw)return;
+  const [,m,d]=raw.split('-').map(Number);
+  if(editId){ const s=students.find(x=>x.id===editId); if(s){s.name=name;s.month=m;s.day=d;} }
+  else students.push({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),name,month:m,day:d});
+  save(); cancelEdit();
+});
+$('cancelEdit').onclick=cancelEdit;
+
+function updateNotificationStatus(){
+  if(!('Notification' in window)) $('notificationStatus').textContent='Ikke støttet';
+  else if(Notification.permission==='granted') $('notificationStatus').textContent='Aktivert';
+  else if(Notification.permission==='denied') $('notificationStatus').textContent='Blokkert i nettleseren';
+  else $('notificationStatus').textContent='Ikke aktivert';
+}
+async function requestNotifications(){
+  if(!('Notification' in window)){alert('Denne nettleseren støtter ikke varsler.');return;}
+  const p=await Notification.requestPermission(); updateNotificationStatus(); if(p==='granted') maybeNotifyBirthday(true);
+}
+function sendNotification(text){
+  if(Notification.permission!=='granted')return;
+  if(navigator.serviceWorker?.ready){navigator.serviceWorker.ready.then(reg=>reg.showNotification('Bursdagsoversikt',{body:text,icon:'icon.svg',badge:'icon.svg',tag:'birthday'}));}
+  else new Notification('Bursdagsoversikt',{body:text});
+}
+function maybeNotifyBirthday(force=false){
+  if(!('Notification' in window)||Notification.permission!=='granted')return;
+  const t=todayParts(); const todays=students.filter(s=>s.day===t.d&&s.month===t.m); if(!todays.length)return;
+  const key=`${t.y}-${pad(t.m)}-${pad(t.d)}`; const last=localStorage.getItem(NOTIFIED_KEY);
+  if(force||last!==key){
+    const text=todays.length===1?`${todays[0].name} har bursdag i dag`:`${todays.map(s=>s.name).join(', ')} har bursdag i dag`;
+    sendNotification(text); if(!force)localStorage.setItem(NOTIFIED_KEY,key);
+  }
+}
+$('enableNotifications').onclick=requestNotifications;
+$('testNotification').onclick=async()=>{
+  if(!('Notification' in window)){alert('Denne nettleseren støtter ikke varsler.');return;}
+  if(Notification.permission!=='granted'){const p=await Notification.requestPermission();if(p!=='granted'){updateNotificationStatus();return;}}
+  sendNotification('Dette er et testvarsel fra Bursdagsoversikt.'); updateNotificationStatus();
+};
+
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;$('installBtn').style.display='inline-block';});
+$('installBtn').onclick=async()=>{if(!deferredPrompt)return;deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;$('installBtn').style.display='none';};
+if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
+render();
+</script>
+</body>
+</html>

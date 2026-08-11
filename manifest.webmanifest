@@ -1,0 +1,12 @@
+{
+  "name": "Bursdagsoversikt",
+  "short_name": "Bursdager",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f4f7fb",
+  "theme_color": "#243447",
+  "description": "En enkel bursdagsoversikt for elever.",
+  "icons": [
+    {"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+  ]
+}
