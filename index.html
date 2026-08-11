@@ -30,7 +30,7 @@
   </style>
 </head>
 <body>
-<header><div class="wrap"><h1>Bursdagsoversikt</h1><div class="sub">Felles bursdagsliste · v1.2</div></div></header>
+<header><div class="wrap"><h1>Bursdagsoversikt</h1><div class="sub">Felles bursdagsliste · v1.3</div></div></header>
 <main class="wrap">
   <section class="card">
     <div class="topline">
@@ -70,6 +70,14 @@
         <div><h2>Kommende bursdager</h2><div id="pushStatus" class="pushstatus">Varsler er ikke aktivert på denne enheten.</div></div>
         <button id="notifyBtn" class="secondary">Aktiver varsler</button>
       </div>
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line)">
+        <label for="notifyTime">Når vil du ha bursdagsvarsel?</label>
+        <div class="row">
+          <input id="notifyTime" type="time" value="07:00" style="max-width:150px">
+          <button id="saveNotifyTimeBtn" type="button" class="secondary">Lagre tidspunkt</button>
+        </div>
+        <div id="notifyTimeStatus" class="pushstatus">Tidspunktet lagres personlig for din Google-konto.</div>
+      </div>
       <div id="list"></div>
     </section>
   </div>
@@ -79,7 +87,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
-import { getFirestore, collection, addDoc, setDoc, updateDoc, deleteDoc, doc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, setDoc, getDoc, updateDoc, deleteDoc, doc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 import { getMessaging, getToken, isSupported } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-messaging.js";
 
 const firebaseConfig = {
@@ -163,6 +171,34 @@ async function activatePush(){
   }
 }
 
+
+async function loadNotifyTime(user){
+  try{
+    const snap = await getDoc(doc(db,"userSettings",user.uid));
+    const time = snap.exists() && snap.data().notifyTime ? snap.data().notifyTime : "07:00";
+    $("#notifyTime").value = time;
+    $("#notifyTimeStatus").textContent = `Du får bursdagsvarsel rundt kl. ${time}.`;
+  }catch(e){
+    $("#notifyTimeStatus").textContent = "Kunne ikke hente varslingsinnstillingen.";
+  }
+}
+async function saveNotifyTime(){
+  if(!currentUser) return;
+  const time = $("#notifyTime").value;
+  if(!time) return alert("Velg et klokkeslett.");
+  try{
+    await setDoc(doc(db,"userSettings",currentUser.uid),{
+      email:(currentUser.email||"").toLowerCase(),
+      notifyTime:time,
+      updatedAt:serverTimestamp()
+    },{merge:true});
+    $("#notifyTimeStatus").textContent = `Du får bursdagsvarsel rundt kl. ${time}.`;
+  }catch(e){
+    alert("Kunne ikke lagre tidspunktet: "+e.message);
+  }
+}
+$("#saveNotifyTimeBtn").onclick=saveNotifyTime;
+
 $("#loginBtn").onclick=async()=>{
   try{ await signInWithPopup(auth,provider); }
   catch(e){ if(["auth/popup-blocked","auth/cancelled-popup-request","auth/operation-not-supported-in-this-environment"].includes(e.code)) await signInWithRedirect(auth,provider); else setStatus("Innlogging feilet: "+e.message); }
@@ -179,6 +215,7 @@ onAuthStateChanged(auth,user=>{
   $("#userText").textContent=user.email||user.displayName||"Innlogget"; $("#loginBtn").classList.add("hidden"); $("#logoutBtn").classList.remove("hidden");
   if(!allowed.includes((user.email||"").toLowerCase())){ $("#app").classList.add("hidden"); setStatus("Denne Google-kontoen har ikke tilgang til bursdagslisten."); return; }
   $("#app").classList.remove("hidden"); setStatus("Tilkoblet den delte bursdagslisten.");
+  loadNotifyTime(user);
   if(Notification.permission==="granted" && localStorage.getItem("pushEnabled")==="1"){
     $("#notifyBtn").textContent="Varsler aktivert"; $("#pushStatus").textContent="Push-varsler er aktivert på denne enheten."; $("#pushStatus").classList.add("ok");
   }
