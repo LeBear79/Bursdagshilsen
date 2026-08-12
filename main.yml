@@ -1,0 +1,142 @@
+name: Bursdagsvarsler
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+jobs:
+  send-birthday-notifications:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Sett opp Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Installer Firebase Admin
+        run: npm install firebase-admin
+
+      - name: Sjekk bursdager og send varsler
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          cat > birthday-check.js <<'EOF'
+          const admin = require("firebase-admin");
+
+          const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+
+          admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount)
+          });
+
+          const db = admin.firestore();
+          const messaging = admin.messaging();
+
+          async function run() {
+            const now = new Date();
+
+            const parts = new Intl.DateTimeFormat("en-GB", {
+              timeZone: "Europe/Oslo",
+              day: "2-digit",
+              month: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: false
+            }).formatToParts(now);
+
+            const value = type => parts.find(p => p.type === type)?.value;
+            const day = Number(value("day"));
+            const month = Number(value("month"));
+            const hour = Number(value("hour"));
+            const minute = Number(value("minute"));
+
+            const settingsSnap = await db.collection("userSettings").get();
+
+            for (const settingDoc of settingsSnap.docs) {
+              const setting = settingDoc.data();
+              const email = String(setting.email || "").toLowerCase();
+              if (!email) continue;
+
+              const notifyTime = setting.notifyTime || "07:00";
+              const [wantedHour, wantedMinute] = notifyTime.split(":").map(Number);
+
+              const diff =
+                hour * 60 + minute -
+                (wantedHour * 60 + wantedMinute);
+
+              if (diff < 0 || diff >= 15) continue;
+
+              const classSnap = await db
+                .collection("classes")
+                .where("memberEmails", "array-contains", email)
+                .get();
+
+              const todays = [];
+
+              for (const classDoc of classSnap.docs) {
+                const classData = classDoc.data();
+                const birthdaySnap = await classDoc.ref
+                  .collection("birthdays")
+                  .where("day", "==", day)
+                  .where("month", "==", month)
+                  .get();
+
+                for (const birthdayDoc of birthdaySnap.docs) {
+                  const b = birthdayDoc.data();
+                  if (b.name) {
+                    todays.push({
+                      name: b.name,
+                      className: classData.name || "klassen"
+                    });
+                  }
+                }
+              }
+
+              if (!todays.length) {
+                console.log(`Ingen bursdager for ${email} i dag.`);
+                continue;
+              }
+
+              const tokenSnap = await db
+                .collection("pushTokens")
+                .where("uid", "==", settingDoc.id)
+                .where("enabled", "==", true)
+                .get();
+
+              const tokens = tokenSnap.docs
+                .map(doc => doc.data().token)
+                .filter(Boolean);
+
+              if (!tokens.length) {
+                console.log(`Ingen aktive enheter for ${email}`);
+                continue;
+              }
+
+              const body = todays.length === 1
+                ? `${todays[0].name} i ${todays[0].className} har bursdag i dag`
+                : todays.map(x => `${x.name} i ${x.className}`).join(", ") + " har bursdag i dag";
+
+              const result = await messaging.sendEachForMulticast({
+                tokens,
+                data: {
+                  title: "Bursdagsoversikt",
+                  body,
+                  tag: `birthday-${month}-${day}-${settingDoc.id}`
+                }
+              });
+
+              console.log(`Sendt til ${result.successCount} enhet(er) for ${email}`);
+            }
+          }
+
+          run()
+            .then(() => process.exit(0))
+            .catch(err => {
+              console.error(err);
+              process.exit(1);
+            });
+          EOF
+
+          node birthday-check.js
