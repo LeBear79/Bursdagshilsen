@@ -11,7 +11,7 @@ firebase.initializeApp({
 });
 
 const messaging = firebase.messaging();
-const CACHE="bursdagsoversikt-v1.2";
+const CACHE="bursdagsoversikt-v2.1";
 const ASSETS=["./","./index.html","./manifest.webmanifest","./icon.svg"];
 
 self.addEventListener("install",e=>e.waitUntil(
