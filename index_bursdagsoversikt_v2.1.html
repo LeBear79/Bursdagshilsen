@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#173f5f">
+  <title>Bursdagsoversikt</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <style>
+    :root{--ink:#173f5f;--muted:#667085;--bg:#f5f7fb;--card:#fff;--line:#e5e7eb;--accent:#f59e0b;--danger:#b42318;--ok:#067647}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:#17202a}
+    header{background:var(--ink);color:#fff;padding:22px 18px}.wrap{max-width:900px;margin:auto}
+    h1{margin:0;font-size:1.65rem}.sub{opacity:.82;margin-top:4px}
+    main{padding:18px}.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;margin-bottom:16px;box-shadow:0 4px 16px #0000000a}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:end}.grow{flex:1;min-width:180px}
+    label{display:block;font-size:.88rem;font-weight:650;margin:0 0 6px}
+    input{width:100%;padding:12px;border:1px solid #cfd4dc;border-radius:10px;font:inherit;background:white}
+    button{border:0;border-radius:11px;padding:11px 14px;font:inherit;font-weight:700;cursor:pointer;background:var(--ink);color:white}
+    button.secondary{background:#eef2f6;color:var(--ink)} button.danger{background:#fff1f0;color:var(--danger)}
+    button:disabled{opacity:.55;cursor:not-allowed}
+    .topline{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+    .user{font-size:.9rem;color:var(--muted)} .status{padding:10px 12px;border-radius:10px;background:#f2f4f7;color:#475467;margin-top:12px}
+    .pushstatus{font-size:.9rem;color:var(--muted);margin-top:8px}.pushstatus.ok{color:var(--ok);font-weight:650}
+    .today{background:#fff7e6;border-color:#ffd591}.today h2{color:#9a6700}
+    h2{margin:0 0 12px;font-size:1.15rem}.person{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+    .person:first-of-type{border-top:0}.name{font-weight:750}.date{color:var(--muted);font-size:.92rem;margin-top:2px}
+    .actions{display:flex;gap:6px}.actions button{padding:8px 10px}.empty{color:var(--muted);padding:6px 0}
+    .badge{display:inline-block;background:#fff1c2;color:#7a4d00;border-radius:999px;padding:4px 9px;font-size:.8rem;font-weight:700}
+    .hidden{display:none!important}.foot{color:var(--muted);font-size:.82rem;text-align:center;padding:4px 0 20px}
+    .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 16px}.tab{background:#e9eef4;color:var(--ink);border:1px solid #d6dde6}
+    .tab.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+    .classmeta{font-size:.88rem;color:var(--muted);margin-top:-4px;margin-bottom:12px}
+    .memberchips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.chip{display:flex;align-items:center;gap:6px;background:#eef2f6;border-radius:999px;padding:6px 9px;font-size:.84rem}
+    .chip button{padding:0;background:transparent;color:var(--danger);font-size:1rem}
+    .sep{border-top:1px solid var(--line);margin:16px 0}
+  </style>
+</head>
+<body>
+<header><div class="wrap"><h1>Bursdagsoversikt</h1><div class="sub">Klassevis bursdagsliste · v2.1</div></div></header>
+<main class="wrap">
+  <section class="card">
+    <div class="topline">
+      <div>
+        <h2>Innlogging</h2>
+        <div id="userText" class="user">Ikke logget inn</div>
+      </div>
+      <div>
+        <button id="loginBtn">Logg inn med Google</button>
+        <button id="logoutBtn" class="secondary hidden">Logg ut</button>
+      </div>
+    </div>
+    <div id="status" class="status">Logg inn for å åpne bursdagsoversikten.</div>
+  </section>
+
+  <div id="app" class="hidden">
+    <section id="classAdminCard" class="card hidden">
+      <h2>Legg til klasse</h2>
+      <div class="row">
+        <div class="grow"><label for="newClassName">Klasse</label><input id="newClassName" maxlength="20" placeholder="F.eks. 9D"></div>
+        <div class="grow"><label for="newClassColleague">Del med kollega (valgfritt)</label><input id="newClassColleague" type="email" placeholder="kollega@gmail.com"></div>
+        <button id="createClassBtn" type="button">Opprett klasse</button>
+      </div>
+      <div class="pushstatus">Du kan opprette flere klasser. Hver kollega ser bare klassene som er delt med vedkommende.</div>
+    </section>
+
+    <section class="card">
+      <h2>Mine klasser</h2>
+      <div id="classTabs" class="tabs"></div>
+      <div id="noClasses" class="empty">Ingen klasser er tilgjengelige ennå.</div>
+    </section>
+
+    <div id="classContent" class="hidden">
+      <section id="todayCard" class="card today hidden">
+        <span class="badge">Bursdag i dag</span>
+        <h2 id="todayText" style="margin-top:10px"></h2>
+      </section>
+
+      <section id="shareCard" class="card hidden">
+        <h2>Del <span id="shareClassName"></span></h2>
+        <div class="classmeta">Bare du som opprettet klassen kan endre hvem den deles med.</div>
+        <div class="row">
+          <div class="grow"><label for="shareEmail">Kollegaens Google-adresse</label><input id="shareEmail" type="email" placeholder="kollega@gmail.com"></div>
+          <button id="addMemberBtn" type="button">Legg til</button>
+        </div>
+        <div id="memberChips" class="memberchips"></div>
+      </section>
+
+      <section id="legacyCard" class="card hidden">
+        <h2>Eksisterende bursdagsliste</h2>
+        <div class="pushstatus">Hvis du vil flytte den gamle felleslisten inn i valgt klasse, kan du importere den her. Knappen kan trykkes flere ganger uten å lage duplikater.</div>
+        <button id="importLegacyBtn" type="button" class="secondary" style="margin-top:10px">Importer gammel liste til denne klassen</button>
+      </section>
+
+      <section class="card">
+        <h2 id="formTitle">Legg til elev</h2>
+        <form id="birthdayForm">
+          <div class="row">
+            <div class="grow"><label for="name">Fornavn</label><input id="name" maxlength="40" required autocomplete="off" placeholder="F.eks. Brede"></div>
+            <div><label for="day">Dag</label><input id="day" type="number" min="1" max="31" required style="width:90px"></div>
+            <div><label for="month">Måned</label><input id="month" type="number" min="1" max="12" required style="width:100px"></div>
+            <button id="saveBtn" type="submit">Lagre</button>
+            <button id="cancelBtn" type="button" class="secondary hidden">Avbryt</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card">
+        <div class="topline">
+          <div>
+            <h2 id="birthdayHeading">Kommende bursdager</h2>
+            <div id="pushStatus" class="pushstatus">Varsler er ikke aktivert på denne enheten.</div>
+          </div>
+          <button id="notifyBtn" class="secondary">Aktiver varsler</button>
+        </div>
+        <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line)">
+          <label for="notifyTime">Når vil du ha bursdagsvarsel?</label>
+          <div class="row">
+            <input id="notifyTime" type="time" value="07:00" style="max-width:150px">
+            <button id="saveNotifyTimeBtn" type="button" class="secondary">Lagre tidspunkt</button>
+          </div>
+          <div id="notifyTimeStatus" class="pushstatus">Tidspunktet er personlig for din Google-konto og gjelder alle klassene du har tilgang til.</div>
+        </div>
+        <div id="list"></div>
+      </section>
+    </div>
+  </div>
+
+  <div class="foot">Klasser deles bare med Google-adressene du legger til. En lærer ser ikke andre klasser som ikke er delt med vedkommende.</div>
+</main>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+import {
+  getFirestore, collection, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, doc,
+  onSnapshot, serverTimestamp, query, where, arrayUnion, arrayRemove
+} from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+import { getMessaging, getToken, isSupported } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-messaging.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBBbv3y6P3SkITm897vkLgzArBxe52uqYw",
+  authDomain: "bursdagsdager.firebaseapp.com",
+  projectId: "bursdagsdager",
+  storageBucket: "bursdagsdager.firebasestorage.app",
+  messagingSenderId: "343294091630",
+  appId: "1:343294091630:web:ed74b431bbfdb52061a17f",
+  measurementId: "G-Y40JCKP8VG"
+};
+
+const VAPID_KEY = "BJovCwJpqvThCrByrlBM4AYApMHcjTCXQwIFaBZh6mveSoQqm8KnekDzrDwj6KcKCOlMT8-D-y_VgVQJ1bbj_KI";
+const ADMIN_EMAIL = "geirbjornethun@gmail.com";
+
+const fb = initializeApp(firebaseConfig);
+const auth = getAuth(fb);
+const db = getFirestore(fb);
+const provider = new GoogleAuthProvider();
+const $ = s => document.querySelector(s);
+
+let currentUser = null;
+let classes = [];
+let currentClassId = null;
+let birthdays = [];
+let editingId = null;
+let unsubClasses = null;
+let unsubBirthdays = null;
+let birthdaysLoading = false;
+let swReg = null;
+
+const months=["januar","februar","mars","april","mai","juni","juli","august","september","oktober","november","desember"];
+
+function emailOf(user=currentUser){ return (user?.email||"").toLowerCase(); }
+function setStatus(t){ $("#status").textContent=t; }
+function esc(s){ return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m])); }
+function validDate(d,m){ const x=new Date(2024,m-1,d); return x.getMonth()===m-1 && x.getDate()===d; }
+function daysUntil(day,month){
+  const now=new Date(); const start=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  let target=new Date(now.getFullYear(),month-1,day);
+  if(target<start) target=new Date(now.getFullYear()+1,month-1,day);
+  return Math.round((target-start)/86400000);
+}
+function currentClass(){ return classes.find(c=>c.id===currentClassId) || null; }
+function isOwner(){ return currentClass()?.ownerUid === currentUser?.uid; }
+
+function renderClasses(){
+  $("#classTabs").innerHTML = classes.map(c =>
+    `<button class="tab ${c.id===currentClassId?"active":""}" data-class="${c.id}">${esc(c.name)}</button>`
+  ).join("");
+  $("#noClasses").classList.toggle("hidden", classes.length>0);
+  $("#classContent").classList.toggle("hidden", !currentClassId);
+}
+
+function renderSharing(){
+  const c=currentClass();
+  if(!c){ $("#shareCard").classList.add("hidden"); return; }
+  const owner=isOwner();
+  $("#shareCard").classList.toggle("hidden", !owner);
+  if(!owner) return;
+  $("#shareClassName").textContent=c.name;
+  const emails=(c.memberEmails||[]).map(x=>String(x).toLowerCase());
+  $("#memberChips").innerHTML=emails.map(e=>{
+    const removable=e!==emailOf();
+    return `<div class="chip">${esc(e)}${removable?`<button title="Fjern" data-remove-member="${esc(e)}">×</button>`:""}</div>`;
+  }).join("");
+}
+
+function renderBirthdays(){
+  const c=currentClass();
+  $("#birthdayHeading").textContent = c ? `Kommende bursdager · ${c.name}` : "Kommende bursdager";
+  if(birthdaysLoading){
+    $("#todayCard").classList.add("hidden");
+    $("#list").innerHTML = `<div class="empty">Henter bursdager for ${c?esc(c.name):"klassen"} …</div>`;
+    return;
+  }
+  const sorted=[...birthdays].sort((a,b)=>daysUntil(a.day,a.month)-daysUntil(b.day,b.month)||a.name.localeCompare(b.name,"nb"));
+  const today=sorted.filter(x=>daysUntil(x.day,x.month)===0);
+  if(today.length && c){
+    $("#todayCard").classList.remove("hidden");
+    $("#todayText").textContent = today.length===1
+      ? `${today[0].name} i ${c.name} har bursdag i dag!`
+      : `${today.map(x=>x.name).join(" og ")} i ${c.name} har bursdag i dag!`;
+  } else $("#todayCard").classList.add("hidden");
+
+  $("#list").innerHTML = sorted.length ? sorted.map(x=>{
+    const n=daysUntil(x.day,x.month);
+    const when=n===0?"I dag":n===1?"I morgen":`Om ${n} dager`;
+    return `<div class="person"><div><div class="name">${esc(x.name)}</div><div class="date">${x.day}. ${months[x.month-1]} · ${when}</div></div>
+      <div class="actions"><button class="secondary" data-edit="${x.id}">Rediger</button><button class="danger" data-del="${x.id}">Slett</button></div></div>`;
+  }).join("") : `<div class="empty">Ingen bursdager er lagt inn i ${c?esc(c.name):"klassen"} ennå.</div>`;
+}
+
+function selectClass(id){
+  if(unsubBirthdays){ unsubBirthdays(); unsubBirthdays=null; }
+
+  currentClassId=id || null;
+  birthdays=[];
+  birthdaysLoading=Boolean(id);
+
+  if(id) localStorage.setItem("birthdayClassId",id);
+  else localStorage.removeItem("birthdayClassId");
+
+  resetForm();
+  renderClasses();
+  renderSharing();
+  renderBirthdays();
+
+  const c=currentClass();
+  if(!c){
+    birthdaysLoading=false;
+    renderBirthdays();
+    return;
+  }
+
+  const selectedId=id;
+  unsubBirthdays=onSnapshot(
+    collection(db,"classes",selectedId,"birthdays"),
+    snap=>{
+      // Ignore a late callback from a class that is no longer selected.
+      if(currentClassId!==selectedId) return;
+      birthdays=snap.docs.map(d=>({id:d.id,...d.data()}));
+      birthdaysLoading=false;
+      renderBirthdays();
+      setStatus(`Tilkoblet bursdagsoversikten · ${birthdays.length} bursdag${birthdays.length===1?"":"er"} i ${c.name}.`);
+    },
+    err=>{
+      if(currentClassId!==selectedId) return;
+      birthdays=[];
+      birthdaysLoading=false;
+      renderBirthdays();
+      setStatus("Kunne ikke lese bursdager: "+err.message);
+      console.error("Firestore birthdays listener:",err);
+    }
+  );
+}
+
+async function tokenDocId(token){
+  const bytes = new TextEncoder().encode(token);
+  const hash = await crypto.subtle.digest("SHA-256", bytes);
+  return [...new Uint8Array(hash)].map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+async function activatePush(){
+  if(!currentUser) return alert("Logg inn først.");
+  if(!("Notification" in window)) return alert("Denne nettleseren støtter ikke varsler.");
+  if(!(await isSupported())) return alert("Push-varsler støttes ikke på denne enheten/nettleseren.");
+  try{
+    const permission = await Notification.requestPermission();
+    if(permission !== "granted") return alert("Varsler ble ikke tillatt.");
+    if(!swReg) swReg = await navigator.serviceWorker.register("./sw.js");
+    await navigator.serviceWorker.ready;
+    const messaging = getMessaging(fb);
+    const token = await getToken(messaging,{vapidKey:VAPID_KEY,serviceWorkerRegistration:swReg});
+    if(!token) throw new Error("Firebase returnerte ingen varslings-ID.");
+    const id=await tokenDocId(token);
+    await setDoc(doc(db,"pushTokens",id),{
+      token,email:emailOf(),uid:currentUser.uid,enabled:true,updatedAt:serverTimestamp()
+    },{merge:true});
+    localStorage.setItem("pushEnabled","1");
+    $("#notifyBtn").textContent="Varsler aktivert";
+    $("#pushStatus").textContent="Push-varsler er aktivert på denne enheten.";
+    $("#pushStatus").classList.add("ok");
+  }catch(err){ console.error(err); alert("Kunne ikke aktivere push-varsler: "+err.message); }
+}
+async function loadNotifyTime(user){
+  try{
+    const snap=await getDoc(doc(db,"userSettings",user.uid));
+    const time=snap.exists()&&snap.data().notifyTime?snap.data().notifyTime:"07:00";
+    $("#notifyTime").value=time;
+    $("#notifyTimeStatus").textContent=`Du får bursdagsvarsel rundt kl. ${time} for klassene du har tilgang til.`;
+  }catch(e){ $("#notifyTimeStatus").textContent="Kunne ikke hente varslingsinnstillingen."; }
+}
+async function saveNotifyTime(){
+  if(!currentUser)return;
+  const time=$("#notifyTime").value;
+  if(!time)return alert("Velg et klokkeslett.");
+  try{
+    await setDoc(doc(db,"userSettings",currentUser.uid),{
+      email:emailOf(),notifyTime:time,updatedAt:serverTimestamp()
+    },{merge:true});
+    $("#notifyTimeStatus").textContent=`Du får bursdagsvarsel rundt kl. ${time} for klassene du har tilgang til.`;
+  }catch(e){ alert("Kunne ikke lagre tidspunktet: "+e.message); }
+}
+
+$("#createClassBtn").onclick=async()=>{
+  if(emailOf()!==ADMIN_EMAIL)return;
+  const name=$("#newClassName").value.trim().toUpperCase();
+  const colleague=$("#newClassColleague").value.trim().toLowerCase();
+  if(!name)return alert("Skriv inn klassenavn.");
+  const memberEmails=[emailOf()];
+  if(colleague && !memberEmails.includes(colleague)) memberEmails.push(colleague);
+  try{
+    const ref=await addDoc(collection(db,"classes"),{
+      name,ownerUid:currentUser.uid,ownerEmail:emailOf(),memberEmails,createdAt:serverTimestamp(),updatedAt:serverTimestamp()
+    });
+    $("#newClassName").value=""; $("#newClassColleague").value="";
+    localStorage.setItem("birthdayClassId",ref.id);
+  }catch(e){ alert("Kunne ikke opprette klasse: "+e.message); }
+};
+
+$("#classTabs").onclick=e=>{
+  const id=e.target.dataset.class;
+  if(id)selectClass(id);
+};
+
+$("#addMemberBtn").onclick=async()=>{
+  const c=currentClass();
+  if(!c||!isOwner())return;
+  const em=$("#shareEmail").value.trim().toLowerCase();
+  if(!em||!em.includes("@"))return alert("Skriv inn en gyldig e-postadresse.");
+  try{
+    await updateDoc(doc(db,"classes",c.id),{memberEmails:arrayUnion(em),updatedAt:serverTimestamp()});
+    $("#shareEmail").value="";
+  }catch(e){ alert("Kunne ikke dele klassen: "+e.message); }
+};
+$("#memberChips").onclick=async e=>{
+  const em=e.target.dataset.removeMember;
+  const c=currentClass();
+  if(!em||!c||!isOwner())return;
+  if(confirm(`Fjerne ${em} fra ${c.name}?`)){
+    try{ await updateDoc(doc(db,"classes",c.id),{memberEmails:arrayRemove(em),updatedAt:serverTimestamp()}); }
+    catch(err){ alert("Kunne ikke fjerne tilgang: "+err.message); }
+  }
+};
+
+$("#importLegacyBtn").onclick=async()=>{
+  const c=currentClass();
+  if(!c||emailOf()!==ADMIN_EMAIL)return;
+  if(!confirm(`Importere den gamle bursdagslisten til ${c.name}?`))return;
+  try{
+    const snap=await getDocs(collection(db,"birthdays"));
+    if(snap.empty)return alert("Fant ingen gammel bursdagsliste.");
+    let count=0;
+    for(const d of snap.docs){
+      const x=d.data();
+      if(!x.name||!x.day||!x.month)continue;
+      await setDoc(doc(db,"classes",c.id,"birthdays",d.id),{
+        name:x.name,day:Number(x.day),month:Number(x.month),
+        importedFromLegacy:true,updatedAt:serverTimestamp()
+      },{merge:true});
+      count++;
+    }
+    const verifySnap=await getDocs(collection(db,"classes",c.id,"birthdays"));
+    birthdays=verifySnap.docs.map(d=>({id:d.id,...d.data()}));
+    birthdaysLoading=false;
+    renderBirthdays();
+    setStatus(`Import fullført · ${birthdays.length} bursdager ligger nå i ${c.name}.`);
+    alert(`${count} bursdager er importert til ${c.name}. Listen inneholder nå ${birthdays.length} bursdager.`);
+  }catch(e){
+    console.error("Importfeil:",e);
+    alert("Kunne ikke importere gammel liste: "+e.message);
+  }
+};
+
+$("#birthdayForm").onsubmit=async e=>{
+  e.preventDefault();
+  const c=currentClass(); if(!c)return;
+  const name=$("#name").value.trim(),day=Number($("#day").value),month=Number($("#month").value);
+  if(!name||!validDate(day,month)){alert("Kontroller navn og dato.");return;}
+  $("#saveBtn").disabled=true;
+  try{
+    if(editingId)await updateDoc(doc(db,"classes",c.id,"birthdays",editingId),{name,day,month,updatedAt:serverTimestamp()});
+    else await addDoc(collection(db,"classes",c.id,"birthdays"),{name,day,month,createdAt:serverTimestamp()});
+    resetForm();
+  }catch(err){alert("Kunne ikke lagre: "+err.message);}
+  finally{$("#saveBtn").disabled=false;}
+};
+function resetForm(){
+  editingId=null; $("#birthdayForm").reset(); $("#formTitle").textContent="Legg til elev";
+  $("#saveBtn").textContent="Lagre"; $("#cancelBtn").classList.add("hidden");
+}
+$("#cancelBtn").onclick=resetForm;
+$("#list").onclick=async e=>{
+  const edit=e.target.dataset.edit,del=e.target.dataset.del,c=currentClass();
+  if(!c)return;
+  if(edit){
+    const x=birthdays.find(b=>b.id===edit); if(!x)return;
+    editingId=x.id; $("#name").value=x.name; $("#day").value=x.day; $("#month").value=x.month;
+    $("#formTitle").textContent="Rediger elev"; $("#saveBtn").textContent="Oppdater"; $("#cancelBtn").classList.remove("hidden");
+    window.scrollTo({top:0,behavior:"smooth"});
+  }
+  if(del){
+    const x=birthdays.find(b=>b.id===del);
+    if(x&&confirm(`Slette ${x.name} fra ${c.name}?`))await deleteDoc(doc(db,"classes",c.id,"birthdays",del));
+  }
+};
+
+$("#saveNotifyTimeBtn").onclick=saveNotifyTime;
+$("#notifyBtn").onclick=activatePush;
+$("#loginBtn").onclick=async()=>{
+  try{await signInWithPopup(auth,provider);}
+  catch(e){
+    if(["auth/popup-blocked","auth/cancelled-popup-request","auth/operation-not-supported-in-this-environment"].includes(e.code))
+      await signInWithRedirect(auth,provider);
+    else setStatus("Innlogging feilet: "+e.message);
+  }
+};
+$("#logoutBtn").onclick=()=>signOut(auth);
+getRedirectResult(auth).catch(e=>setStatus("Innlogging feilet: "+e.message));
+
+onAuthStateChanged(auth,user=>{
+  currentUser=user;
+  if(unsubClasses){unsubClasses();unsubClasses=null;}
+  if(unsubBirthdays){unsubBirthdays();unsubBirthdays=null;}
+  classes=[];birthdays=[];currentClassId=null;
+  if(!user){
+    $("#userText").textContent="Ikke logget inn";$("#loginBtn").classList.remove("hidden");$("#logoutBtn").classList.add("hidden");
+    $("#app").classList.add("hidden");setStatus("Logg inn for å åpne bursdagsoversikten.");return;
+  }
+  $("#userText").textContent=user.email||user.displayName||"Innlogget";
+  $("#loginBtn").classList.add("hidden");$("#logoutBtn").classList.remove("hidden");$("#app").classList.remove("hidden");
+  $("#classAdminCard").classList.toggle("hidden",emailOf()!==ADMIN_EMAIL);
+  $("#legacyCard").classList.toggle("hidden",emailOf()!==ADMIN_EMAIL);
+  setStatus("Tilkoblet bursdagsoversikten.");
+  loadNotifyTime(user);
+  if(Notification.permission==="granted"&&localStorage.getItem("pushEnabled")==="1"){
+    $("#notifyBtn").textContent="Varsler aktivert";$("#pushStatus").textContent="Push-varsler er aktivert på denne enheten.";$("#pushStatus").classList.add("ok");
+  }
+
+  const q=query(collection(db,"classes"),where("memberEmails","array-contains",emailOf()));
+  unsubClasses=onSnapshot(q,snap=>{
+    classes=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.name||"").localeCompare(b.name||"","nb"));
+    const remembered=localStorage.getItem("birthdayClassId");
+    const wanted=classes.some(c=>c.id===currentClassId)?currentClassId:
+      classes.some(c=>c.id===remembered)?remembered:(classes[0]?.id||null);
+    renderClasses();
+    if(wanted!==currentClassId)selectClass(wanted);
+    else{renderSharing();renderBirthdays();}
+  },err=>setStatus("Kunne ikke lese klassene: "+err.message));
+});
+
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.register("./sw.js").then(r=>swReg=r).catch(console.error);
+}
+</script>
+</body>
+</html>
