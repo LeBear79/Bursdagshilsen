@@ -37,7 +37,7 @@
   </style>
 </head>
 <body>
-<header><div class="wrap"><h1>Bursdagsoversikt</h1><div class="sub">Klassevis bursdagsliste · v2.0</div></div></header>
+<header><div class="wrap"><h1>Bursdagsoversikt</h1><div class="sub">Klassevis bursdagsliste · v2.1</div></div></header>
 <main class="wrap">
   <section class="card">
     <div class="topline">
@@ -164,6 +164,7 @@ let birthdays = [];
 let editingId = null;
 let unsubClasses = null;
 let unsubBirthdays = null;
+let birthdaysLoading = false;
 let swReg = null;
 
 const months=["januar","februar","mars","april","mai","juni","juli","august","september","oktober","november","desember"];
@@ -206,6 +207,11 @@ function renderSharing(){
 function renderBirthdays(){
   const c=currentClass();
   $("#birthdayHeading").textContent = c ? `Kommende bursdager · ${c.name}` : "Kommende bursdager";
+  if(birthdaysLoading){
+    $("#todayCard").classList.add("hidden");
+    $("#list").innerHTML = `<div class="empty">Henter bursdager for ${c?esc(c.name):"klassen"} …</div>`;
+    return;
+  }
   const sorted=[...birthdays].sort((a,b)=>daysUntil(a.day,a.month)-daysUntil(b.day,b.month)||a.name.localeCompare(b.name,"nb"));
   const today=sorted.filter(x=>daysUntil(x.day,x.month)===0);
   if(today.length && c){
@@ -224,19 +230,47 @@ function renderBirthdays(){
 }
 
 function selectClass(id){
-  currentClassId=id;
-  localStorage.setItem("birthdayClassId",id);
-  resetForm();
   if(unsubBirthdays){ unsubBirthdays(); unsubBirthdays=null; }
-  const c=currentClass();
-  if(!c){ birthdays=[]; renderClasses(); renderSharing(); renderBirthdays(); return; }
-  unsubBirthdays=onSnapshot(collection(db,"classes",id,"birthdays"),snap=>{
-    birthdays=snap.docs.map(d=>({id:d.id,...d.data()}));
-    renderBirthdays();
-  },err=>setStatus("Kunne ikke lese bursdager: "+err.message));
+
+  currentClassId=id || null;
+  birthdays=[];
+  birthdaysLoading=Boolean(id);
+
+  if(id) localStorage.setItem("birthdayClassId",id);
+  else localStorage.removeItem("birthdayClassId");
+
+  resetForm();
   renderClasses();
   renderSharing();
   renderBirthdays();
+
+  const c=currentClass();
+  if(!c){
+    birthdaysLoading=false;
+    renderBirthdays();
+    return;
+  }
+
+  const selectedId=id;
+  unsubBirthdays=onSnapshot(
+    collection(db,"classes",selectedId,"birthdays"),
+    snap=>{
+      // Ignore a late callback from a class that is no longer selected.
+      if(currentClassId!==selectedId) return;
+      birthdays=snap.docs.map(d=>({id:d.id,...d.data()}));
+      birthdaysLoading=false;
+      renderBirthdays();
+      setStatus(`Tilkoblet bursdagsoversikten · ${birthdays.length} bursdag${birthdays.length===1?"":"er"} i ${c.name}.`);
+    },
+    err=>{
+      if(currentClassId!==selectedId) return;
+      birthdays=[];
+      birthdaysLoading=false;
+      renderBirthdays();
+      setStatus("Kunne ikke lese bursdager: "+err.message);
+      console.error("Firestore birthdays listener:",err);
+    }
+  );
 }
 
 async function tokenDocId(token){
@@ -344,8 +378,16 @@ $("#importLegacyBtn").onclick=async()=>{
       },{merge:true});
       count++;
     }
-    alert(`${count} bursdager er importert til ${c.name}.`);
-  }catch(e){ alert("Kunne ikke importere gammel liste: "+e.message); }
+    const verifySnap=await getDocs(collection(db,"classes",c.id,"birthdays"));
+    birthdays=verifySnap.docs.map(d=>({id:d.id,...d.data()}));
+    birthdaysLoading=false;
+    renderBirthdays();
+    setStatus(`Import fullført · ${birthdays.length} bursdager ligger nå i ${c.name}.`);
+    alert(`${count} bursdager er importert til ${c.name}. Listen inneholder nå ${birthdays.length} bursdager.`);
+  }catch(e){
+    console.error("Importfeil:",e);
+    alert("Kunne ikke importere gammel liste: "+e.message);
+  }
 };
 
 $("#birthdayForm").onsubmit=async e=>{
