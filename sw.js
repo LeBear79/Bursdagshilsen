@@ -9,7 +9,7 @@ messagingSenderId: "343294091630",
 appId: "1:343294091630:web:ed74b431bbfdb52061a17f"
 });
 const messaging = firebase.messaging();
-const CACHE="bursdagsoversikt-v2.3";
+const CACHE="bursdagsoversikt-v2.4";
 const ASSETS=["./","./index.html","./manifest.webmanifest","./icon.svg"];
 self.addEventListener("install",e=>e.waitUntil(
 caches.open(CACHE).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting())

@@ -53,7 +53,7 @@
   <div class="wrap headerbar">
     <div>
       <h1>Bursdagsoversikt</h1>
-      <div class="sub">Klassevis bursdagsliste · v2.3</div>
+      <div class="sub">Klassevis bursdagsliste · v2.4</div>
     </div>
     <div class="headerUser">
       <span id="headerUserText">Ikke logget inn</span>
@@ -88,12 +88,7 @@
     </section>
 
     <div id="classContent" class="hidden">
-      <section id="todayCard" class="card today hidden">
-        <span class="badge">Bursdag i dag</span>
-        <h2 id="todayText" style="margin-top:10px"></h2>
-      </section>
-
-      <section id="shareCard" class="card hidden">
+<section id="shareCard" class="card hidden">
         <h2>Del <span id="shareClassName"></span></h2>
         <div class="classmeta">Bare du som opprettet klassen kan endre hvem den deles med.</div>
         <div class="row">
@@ -298,20 +293,11 @@ function renderBirthdays(){
   renderNextBirthday();
   $("#birthdayHeading").textContent = c ? `Kommende bursdager · ${c.name}` : "Kommende bursdager";
   if(birthdaysLoading){
-    $("#todayCard").classList.add("hidden");
     $("#list").innerHTML = `<div class="empty">Henter bursdager for ${c?esc(c.name):"klassen"} …</div>`;
     return;
   }
   const sorted=[...birthdays].sort((a,b)=>daysUntil(a.day,a.month)-daysUntil(b.day,b.month)||a.name.localeCompare(b.name,"nb"));
-  const today=sorted.filter(x=>daysUntil(x.day,x.month)===0);
-  if(today.length && c){
-    $("#todayCard").classList.remove("hidden");
-    $("#todayText").textContent = today.length===1
-      ? `${today[0].name} i ${c.name} har bursdag i dag!`
-      : `${today.map(x=>x.name).join(" og ")} i ${c.name} har bursdag i dag!`;
-  } else $("#todayCard").classList.add("hidden");
-
-  $("#list").innerHTML = sorted.length ? sorted.map(x=>{
+$("#list").innerHTML = sorted.length ? sorted.map(x=>{
     const n=daysUntil(x.day,x.month);
     const when=n===0?"I dag":n===1?"I morgen":`Om ${n} dager`;
     return `<div class="person"><div><div class="name">${esc(x.name)}</div><div class="date">${x.day}. ${months[x.month-1]} · ${when}</div></div>
