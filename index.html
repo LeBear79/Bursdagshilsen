@@ -11,6 +11,18 @@
     *{box-sizing:border-box}
     body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:#17202a}
     header{background:var(--ink);color:#fff;padding:22px 18px}.wrap{max-width:900px;margin:auto}
+    .headerbar{display:flex;justify-content:space-between;align-items:center;gap:16px}
+    .headerUser{display:flex;align-items:center;gap:10px;font-size:.86rem;max-width:48%;text-align:right}
+    .headerUser span{opacity:.88;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .headerBtn{padding:8px 11px;border-radius:10px;background:#ffffff20;color:#fff;border:1px solid #ffffff35}
+    .nextBirthday{background:#fff8db;border-color:#f4d37a;position:relative;overflow:hidden}
+    .nextBirthday.todayState{background:#fff0b8;border-color:#e6b94b}
+    .nextEyebrow{font-size:.8rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#8a6100;margin-bottom:8px}
+    .nextName{font-size:1.45rem;font-weight:850;color:#6f4d00}
+    .nextMeta{margin-top:5px;color:#765f2d}
+    .confetti-piece{position:fixed;top:-24px;width:9px;height:14px;border-radius:2px;z-index:9999;pointer-events:none;animation:confettiFall var(--dur) linear forwards;transform:rotate(var(--rot))}
+    @keyframes confettiFall{to{transform:translate3d(var(--x),110vh,0) rotate(calc(var(--rot) + 720deg));opacity:.95}}
+    @media(max-width:650px){.headerbar{align-items:flex-start}.headerUser{max-width:55%;flex-wrap:wrap;justify-content:flex-end}.headerUser span{width:100%}}
     h1{margin:0;font-size:1.65rem}.sub{opacity:.82;margin-top:4px}
     main{padding:18px}.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;margin-bottom:16px;box-shadow:0 4px 16px #0000000a}
     .row{display:flex;gap:10px;flex-wrap:wrap;align-items:end}.grow{flex:1;min-width:180px}
@@ -37,21 +49,26 @@
   </style>
 </head>
 <body>
-<header><div class="wrap"><h1>Bursdagsoversikt</h1><div class="sub">Klassevis bursdagsliste · v2.1</div></div></header>
-<main class="wrap">
-  <section class="card">
-    <div class="topline">
-      <div>
-        <h2>Innlogging</h2>
-        <div id="userText" class="user">Ikke logget inn</div>
-      </div>
-      <div>
-        <button id="loginBtn">Logg inn med Google</button>
-        <button id="logoutBtn" class="secondary hidden">Logg ut</button>
-      </div>
+<header>
+  <div class="wrap headerbar">
+    <div>
+      <h1>Bursdagsoversikt</h1>
+      <div class="sub">Klassevis bursdagsliste · v2.2</div>
     </div>
-    <div id="status" class="status">Logg inn for å åpne bursdagsoversikten.</div>
+    <div class="headerUser">
+      <span id="headerUserText">Ikke logget inn</span>
+      <button id="loginBtn" class="headerBtn">Logg inn</button>
+      <button id="logoutBtn" class="headerBtn hidden">Logg ut</button>
+    </div>
+  </div>
+</header>
+<main class="wrap">
+  <section id="nextBirthdayCard" class="card nextBirthday hidden">
+    <div id="nextEyebrow" class="nextEyebrow">Neste bursdagsbarn</div>
+    <div id="nextName" class="nextName"></div>
+    <div id="nextMeta" class="nextMeta"></div>
   </section>
+  
 
   <div id="app" class="hidden">
     <section id="classAdminCard" class="card hidden">
@@ -170,7 +187,7 @@ let swReg = null;
 const months=["januar","februar","mars","april","mai","juni","juli","august","september","oktober","november","desember"];
 
 function emailOf(user=currentUser){ return (user?.email||"").toLowerCase(); }
-function setStatus(t){ $("#status").textContent=t; }
+function setStatus(t){ console.log(t); }
 function esc(s){ return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m])); }
 function validDate(d,m){ const x=new Date(2024,m-1,d); return x.getMonth()===m-1 && x.getDate()===d; }
 function daysUntil(day,month){
@@ -181,6 +198,72 @@ function daysUntil(day,month){
 }
 function currentClass(){ return classes.find(c=>c.id===currentClassId) || null; }
 function isOwner(){ return currentClass()?.ownerUid === currentUser?.uid; }
+
+
+function confettiKeyForToday(names){
+  const now=new Date();
+  const dateKey=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
+  return `birthdayConfetti:${dateKey}:${names.sort().join("|")}`;
+}
+
+function launchConfettiOnce(names){
+  if(!names.length) return;
+  const key=confettiKeyForToday([...names]);
+  if(localStorage.getItem(key)==="1") return;
+  localStorage.setItem(key,"1");
+  const colors=["#f59e0b","#ef4444","#3b82f6","#10b981","#8b5cf6","#ec4899"];
+  for(let i=0;i<70;i++){
+    const el=document.createElement("i");
+    el.className="confetti-piece";
+    el.style.left=Math.random()*100+"vw";
+    el.style.background=colors[i%colors.length];
+    el.style.setProperty("--x",(Math.random()*240-120)+"px");
+    el.style.setProperty("--rot",(Math.random()*360)+"deg");
+    el.style.setProperty("--dur",(2.3+Math.random()*1.7)+"s");
+    el.style.animationDelay=(Math.random()*.6)+"s";
+    document.body.appendChild(el);
+    setTimeout(()=>el.remove(),4500);
+  }
+}
+
+function renderNextBirthday(){
+  const card=$("#nextBirthdayCard");
+  const c=currentClass();
+  if(!currentUser || !c){
+    card.classList.add("hidden");
+    return;
+  }
+
+  const sorted=[...birthdays].sort((a,b)=>daysUntil(a.day,a.month)-daysUntil(b.day,b.month)||a.name.localeCompare(b.name,"nb"));
+
+  card.classList.remove("hidden");
+
+  if(!sorted.length){
+    card.classList.remove("todayState");
+    $("#nextEyebrow").textContent="Neste bursdagsbarn";
+    $("#nextName").textContent=`Ingen bursdager i ${c.name} ennå`;
+    $("#nextMeta").textContent="Legg til en elev for å få neste bursdag her.";
+    return;
+  }
+
+  const today=sorted.filter(x=>daysUntil(x.day,x.month)===0);
+
+  if(today.length){
+    card.classList.add("todayState");
+    $("#nextEyebrow").textContent=today.length===1?"Bursdag i dag!":"Bursdager i dag!";
+    $("#nextName").textContent=today.map(x=>x.name).join(" og ");
+    $("#nextMeta").textContent=`${c.name} · har bursdag i dag`;
+    launchConfettiOnce(today.map(x=>`${x.name}-${c.name}`));
+    return;
+  }
+
+  const next=sorted[0];
+  const n=daysUntil(next.day,next.month);
+  card.classList.remove("todayState");
+  $("#nextEyebrow").textContent="Neste bursdagsbarn";
+  $("#nextName").textContent=next.name;
+  $("#nextMeta").textContent=`${c.name} · ${next.day}. ${months[next.month-1]} · ${n===1?"i morgen":`om ${n} dager`}`;
+}
 
 function renderClasses(){
   $("#classTabs").innerHTML = classes.map(c =>
@@ -206,6 +289,7 @@ function renderSharing(){
 
 function renderBirthdays(){
   const c=currentClass();
+  renderNextBirthday();
   $("#birthdayHeading").textContent = c ? `Kommende bursdager · ${c.name}` : "Kommende bursdager";
   if(birthdaysLoading){
     $("#todayCard").classList.add("hidden");
@@ -442,10 +526,10 @@ onAuthStateChanged(auth,user=>{
   if(unsubBirthdays){unsubBirthdays();unsubBirthdays=null;}
   classes=[];birthdays=[];currentClassId=null;
   if(!user){
-    $("#userText").textContent="Ikke logget inn";$("#loginBtn").classList.remove("hidden");$("#logoutBtn").classList.add("hidden");
-    $("#app").classList.add("hidden");setStatus("Logg inn for å åpne bursdagsoversikten.");return;
+    $("#headerUserText").textContent="Ikke logget inn";$("#loginBtn").classList.remove("hidden");$("#logoutBtn").classList.add("hidden");
+    $("#app").classList.add("hidden");$("#nextBirthdayCard").classList.add("hidden");setStatus("Logg inn for å åpne bursdagsoversikten.");return;
   }
-  $("#userText").textContent=user.email||user.displayName||"Innlogget";
+  $("#headerUserText").textContent=user.email||user.displayName||"Innlogget";
   $("#loginBtn").classList.add("hidden");$("#logoutBtn").classList.remove("hidden");$("#app").classList.remove("hidden");
   $("#classAdminCard").classList.toggle("hidden",emailOf()!==ADMIN_EMAIL);
   $("#legacyCard").classList.toggle("hidden",emailOf()!==ADMIN_EMAIL);
