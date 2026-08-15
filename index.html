@@ -53,7 +53,7 @@
   <div class="wrap headerbar">
     <div>
       <h1>Bursdagsoversikt</h1>
-      <div class="sub">Klassevis bursdagsliste · v2.2</div>
+      <div class="sub">Klassevis bursdagsliste · v2.3</div>
     </div>
     <div class="headerUser">
       <span id="headerUserText">Ikke logget inn</span>
@@ -234,7 +234,10 @@ function renderNextBirthday(){
     return;
   }
 
-  const sorted=[...birthdays].sort((a,b)=>daysUntil(a.day,a.month)-daysUntil(b.day,b.month)||a.name.localeCompare(b.name,"nb"));
+  const sorted=[...birthdays].sort((a,b)=>
+    daysUntil(a.day,a.month)-daysUntil(b.day,b.month) ||
+    a.name.localeCompare(b.name,"nb")
+  );
 
   card.classList.remove("hidden");
 
@@ -252,17 +255,20 @@ function renderNextBirthday(){
     card.classList.add("todayState");
     $("#nextEyebrow").textContent=today.length===1?"Bursdag i dag!":"Bursdager i dag!";
     $("#nextName").textContent=today.map(x=>x.name).join(" og ");
-    $("#nextMeta").textContent=`${c.name} · har bursdag i dag`;
+    $("#nextMeta").textContent=`${c.name} · ${today.length===1?"har":"har"} bursdag i dag`;
     launchConfettiOnce(today.map(x=>`${x.name}-${c.name}`));
     return;
   }
 
-  const next=sorted[0];
-  const n=daysUntil(next.day,next.month);
+  const nextDays=daysUntil(sorted[0].day,sorted[0].month);
+  const nextGroup=sorted.filter(x=>daysUntil(x.day,x.month)===nextDays);
+  const names=nextGroup.map(x=>x.name).join(" og ");
+  const first=nextGroup[0];
+
   card.classList.remove("todayState");
-  $("#nextEyebrow").textContent="Neste bursdagsbarn";
-  $("#nextName").textContent=next.name;
-  $("#nextMeta").textContent=`${c.name} · ${next.day}. ${months[next.month-1]} · ${n===1?"i morgen":`om ${n} dager`}`;
+  $("#nextEyebrow").textContent=nextGroup.length===1?"Neste bursdagsbarn":"Neste bursdagsbarn";
+  $("#nextName").textContent=names;
+  $("#nextMeta").textContent=`${c.name} · ${first.day}. ${months[first.month-1]} · ${nextDays===1?"i morgen":`om ${nextDays} dager`}`;
 }
 
 function renderClasses(){
